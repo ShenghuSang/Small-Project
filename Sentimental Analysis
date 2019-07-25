@@ -1,0 +1,124 @@
+##################################################################################################
+# http://www.rychdata.com/the-news-api-requesting-live-headlines-with-python.html                #
+# https://marcobonzanini.com/2015/09/29/easy-text-analytics-with-the-dandelion-api-and-python/   #
+##################################################################################################
+
+####################################################################################
+# Sometimes, you will meet following Error returned from newsapi.get_everything(), #
+# and you can check below link to fix the Error:                                   #
+#   TypeError: super(type, obj): obj must be an instance or subtype of type #22    #
+#   https://github.com/mattlisiv/newsapi-python/issues/22                          #
+####################################################################################
+
+# Load libraries with alias
+
+import pandas as pd
+import requests
+from newsapi import NewsApiClient
+import datetime
+
+
+# In[]
+'''
+initialization for the dataframe to store all relevant data in the program 
+
+'''
+extraction_date = datetime.datetime.today().strftime('%Y-%m-%d')
+
+file_name = extraction_date.replace('-','')
+date_index = pd.date_range(file_name, periods=1, freq='D')
+articles_adidas_nike = pd.DataFrame(columns=['adidas','nike'])
+articles_adidas_nike = articles_adidas_nike.reindex(date_index)
+articles_adidas_nike = articles_adidas_nike.dropna()
+
+# In[]# Load newsapi
+'''
+1. fetches a sample (10-20 articles) of today’s news articles from NewsAPI that 
+   contain the keywords ‘adidas’ and ‘nike’. 
+'''
+newsapi = NewsApiClient(api_key='Your newsapi key')
+articles_adidas = newsapi.get_everything(q='adidas',from_param=extraction_date,to=extraction_date)
+articles_nike = newsapi.get_everything(q='nike',from_param=extraction_date,to=extraction_date)
+
+# convert from JSON to DataFrame 
+
+data_adidas = pd.DataFrame.from_dict(articles_adidas)
+data_nike = pd.DataFrame.from_dict(articles_nike)
+
+data_adidas = pd.concat([data_adidas.drop(['articles'], axis=1), data_adidas['articles'].apply(pd.Series)], axis=1)
+data_adidas.head()
+
+data_nike = pd.concat([data_nike.drop(['articles'], axis=1), data_nike['articles'].apply(pd.Series)], axis=1)
+data_nike.head()
+
+# In[]
+'''
+2.1 self-defined function to use the Dandalion Sentiment API to get a sentiment score for each article
+
+'''
+DANDELION_APP_KEY = 'Your DANDELION KEY'
+SENTIMENT_URL = 'https://api.dandelion.eu/datatxt/sent/v1'
+
+def get_sentiment(text, lang='en'):
+    payload = {
+        'token': DANDELION_APP_KEY,
+        'text': text,
+        'lang': lang
+    }
+    response = requests.get(SENTIMENT_URL, params=payload)
+    return response.json()
+ 
+# calculate the sentiment score for adidas data
+query_adidas = pd.DataFrame()
+for content in data_adidas.content:
+    response = get_sentiment(content)
+    query_adidas = query_adidas.append(response,ignore_index=True,sort=False)
+
+# calculate the sentiment score for Nike data
+query_nike = pd.DataFrame()
+for content in data_nike.content:
+    response = get_sentiment(content)
+    query_nike = query_nike.append(response,ignore_index=True,sort=False)
+
+# In[]   
+'''
+3. calculate the average sentiment score for adidas and Nike
+   and print a summary of the results on the command line
+'''
+
+# the average sentiment score for adidas
+mean_score_adidas = 0
+counter_adidas_nan = 0
+
+keys_adidas = query_adidas['sentiment'].values
+len_adidas = len(keys_adidas)
+
+print('Summary of the sentiment socre of Adidas:')
+for dictionary in keys_adidas:
+    if pd.isnull(dictionary)==True:
+        mean_score_adidas = mean_score_adidas + 0
+        counter_adidas_nan = counter_adidas_nan + 1
+    else:
+        mean_score_adidas = mean_score_adidas + dictionary['score']
+        print('%.2f' %dictionary['score'])
+mean_score_adidas = mean_score_adidas / (len_adidas-counter_adidas_nan)
+print('The average sentiment score for Adidas is: %.2f on %s.\n' %(mean_score_adidas, extraction_date)) 
+
+# the average sentiment score for Nike
+
+mean_score_nike = 0
+counter_nike_nan = 0
+
+keys_nike = query_nike['sentiment'].values
+len_adidas = len(keys_nike)
+
+print('Summary of the sentiment socre of Adidas:')
+for dictionary in keys_nike:
+    if pd.isnull(dictionary)==True:
+        mean_score_nike = mean_score_nike + 0
+        counter_nike_nan = counter_nike_nan + 1
+    else:
+        mean_score_nike = mean_score_nike + dictionary['score']
+        print('%.2f' %dictionary['score'])
+mean_score_nike = mean_score_nike / (len_adidas-counter_adidas_nan)
+print('The average sentiment score for Nike is: %.2f on %s.' %(mean_score_nike, extraction_date))   
