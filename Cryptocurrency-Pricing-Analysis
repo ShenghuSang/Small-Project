@@ -17,7 +17,7 @@ pd.set_option('display.width', 1000)
 
 
 # In[]
-quandl.ApiConfig.api_key  = 'sxZUr8Amdq_asit6ARyb'
+quandl.ApiConfig.api_key  = 'Your quandl key'
 
 # In[]
 '''
